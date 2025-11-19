@@ -31,19 +31,24 @@ def parse_author_from_url(url: str) -> str:
 def main():
     ensure_csv_header(csv_path)
 
-    urlsToDownload = get_repost_video_urls(
-        tt_link=TT_LINK,
-        max_scrolls=MAX_SCROLLS,
-        scroll_pause_time=SCROLL_PAUSE_TIME,
-        manual_captcha_seconds=MANUAL_CAPTCHA_SECONDS,
-        headless=HEADLESS,
-    )
+    import csv
 
-    for index, url in enumerate(urlsToDownload):
+    my_list = []
+
+    with open("TikTok Creator Link - Standard_full_urls.csv", "r", encoding="utf-8") as f:
+        reader = csv.reader(f)
+        for row in reader:
+            if row:  # 避免空行
+                my_list.append(row[0])
+
+    print(my_list)
+
+
+    for index, url in enumerate(my_list):
         author = parse_author_from_url(url)
         saved_filename = None
 
-        print(f"\n[MAIN INFO]: Downloading video {index + 1}/{len(urlsToDownload)}")
+        print(f"\n[MAIN INFO]: Downloading video {index + 1}/{len(my_list)}")
         print(f"[MAIN INFO]: The link of this repost video: {url}")
 
         try:
