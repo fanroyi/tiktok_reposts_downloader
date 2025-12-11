@@ -2,10 +2,11 @@ TT_LINK = "https://www.tiktok.com/@mellow"
 
 CSV_PATH = "download_log.csv"
 
-MAX_SCROLLS = 4   # change the scroll number
+MAX_SCROLLS = 0 # change the scroll number
 
 
-
+# NEW — add your WL CSV file name here
+WL_LIST_CSV = "Mellow_WL_Live_List.csv"
 
 
 

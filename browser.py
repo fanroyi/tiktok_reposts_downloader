@@ -58,7 +58,7 @@ def get_repost_video_urls(
                 .map(el => el.href)
                 .filter((v, i, a) => a.indexOf(v) === i);
         """
-        urls = driver.execute_script(script) or []
+        urls = driver.execute_script(script) or [] #[link1, link2 , ...]
         print(f"[BROWSER INFO]: Found {len(urls)} reposted videos")
         return urls
     finally:
