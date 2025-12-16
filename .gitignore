@@ -28,3 +28,16 @@ env/
 .DS_Store
 .DS_Store
 .DS_Store
+
+# viedo
+wl videos/
+videos
+download_log_wl.csv
+TikTok Creator Link - Standard_full_urls.csv
+.gitignore
+download_log.csv
+TikTok Creator Link - Standard.csv
+__pycache__/browser.cpython-313.pyc
+.DS_Store
+__pycache__/browser.cpython-313.pyc
+.DS_Store
