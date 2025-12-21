@@ -1,6 +1,9 @@
+# pipeline_utils.py
 import os
 import csv
 import re
+
+from config import PRODUCT_SUBFOLDER_MAP
 
 
 def ensure_csv_header(path: str):
@@ -36,9 +39,25 @@ def sanitize_fs_name(name: str, max_len: int = 140) -> str:
 
 
 def product_to_folder(product_value: str) -> str:
+    """
+    Decide the StdAds product folder name.
+
+    Priority:
+    1) If product_value contains any key in PRODUCT_SUBFOLDER_MAP, use mapped subfolder name.
+    2) Otherwise use default parsing: take text after '|' if exists, sanitize and truncate.
+    """
     if not product_value:
         return "unknown"
-    txt = product_value.strip()
+
+    raw = product_value.strip()
+
+    # 1) override map (contains match)
+    for k, v in PRODUCT_SUBFOLDER_MAP.items():
+        if k and k in raw:
+            return v
+
+    # 2) default behavior
+    txt = raw
     if "|" in txt:
         txt = txt.split("|", 1)[1].strip()
     txt = sanitize_fs_name(txt, max_len=160)
@@ -126,6 +145,33 @@ def get_next_index_for_dir(dir_path: str, start: int) -> int:
                 n = int(m.group(1))
                 max_seen = n if max_seen is None or n > max_seen else max_seen
     return start if max_seen is None else max_seen + 1
+
+
+def preview_product_folder_mapping(rows: list):
+    """
+    Print unique RAW product names and their resulting subfolder names
+    BEFORE downloading, so you can decide overrides in config.py.
+    """
+    seen = {}
+    for row in rows:
+        raw = (row.get("product") or "").strip()
+        if not raw:
+            continue
+        if raw not in seen:
+            seen[raw] = product_to_folder(raw)
+
+    if not seen:
+        return
+
+    print("\n========== PRODUCT → SUBFOLDER PREVIEW ==========")
+    for idx, (raw, folder) in enumerate(seen.items(), 1):
+        print(f"[{idx}]")
+        print("RAW PRODUCT:")
+        print(raw)
+        print("\n→ CURRENT SUBFOLDER:")
+        print(folder)
+        print("\n" + "-" * 56)
+    print("===============================================\n")
 
 
 def preflight_preview(rows: list, wl_authors: set, start_num_by_folder: dict, unknown_start_num: int):

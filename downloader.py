@@ -11,25 +11,13 @@ def downloadVideo(link: str, id: int, save_dir: str = "videos", filename_base: s
     Return the final file path if success, otherwise None.
     """
 
-    cookies = {
-        # 如果你有必须的 cookie，在这里放；没有也可以先空着
-    }
+    cookies = {}  
 
     headers = {
-        "accept": "*/*",
-        "accept-language": "en-US,en;q=0.9",
         "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
-        "hx-current-url": "https://ssstik.io/",
-        "hx-request": "true",
-        "hx-target": "target",
-        "hx-trigger": "_gcaptcha_pt",
         "origin": "https://ssstik.io",
         "referer": "https://ssstik.io/",
-        "user-agent": (
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/138.0.0.0 Safari/537.36"
-        ),
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     }
 
     params = {"url": "dl"}

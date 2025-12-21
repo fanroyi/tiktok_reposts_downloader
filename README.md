@@ -4,6 +4,11 @@ Scrape all reposted TikTok video URLs from a profile and download them (no water
 
 ## Quick Start
 
+python3 -m venv venv
+
+source venv/bin/activate
+
+
 1) Install deps:
 ```bash
 pip install -r requirements.txt

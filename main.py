@@ -2,7 +2,6 @@
 import os
 import time
 import csv
-import shutil
 
 from downloader import downloadVideo
 from config import (
@@ -17,12 +16,13 @@ from config import (
 from pipeline_utils import (
     load_wl_authors,
     load_rows,
-    preflight_preview,
+    preview_product_folder_mapping,
     normalize_author,
     sanitize_fs_name,
     product_to_folder,
     product_to_token,
     get_next_index_for_dir,
+    preflight_preview,
 )
 
 # Ensure base folders exist
@@ -32,36 +32,24 @@ os.makedirs(os.path.join("videos", "unknown"), exist_ok=True)
 
 
 def ensure_csv_header(path: str):
-    """Ensure CSV header matches required export format."""
+    """
+    New unified CSV format:
+    - WL videos only stored under videos/wl/<creator>/
+    - StdAds videos stored under videos/<product_folder>/ or videos/unknown/
+    """
     if not os.path.exists(path):
         with open(path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow([
                 "creator",
                 "video_url",
-                "stdads_filename",
-                "stdads_saved_dir",
-                "wlads_filename",
-                "wlads_saved_dir",
-                "stdads_success",
-                "wl_copy_success",
+                "is_wl",
+                "product_folder",
+                "video_filename",
+                "saved_dir",
+                "success",
                 "error",
             ])
-
-
-def get_available_filepath(dir_path: str, base_name: str, ext: str = ".mp4") -> str:
-    """Avoid overwrite: auto append -1, -2..."""
-    os.makedirs(dir_path, exist_ok=True)
-    candidate = os.path.join(dir_path, f"{base_name}{ext}")
-    if not os.path.exists(candidate):
-        return candidate
-
-    counter = 1
-    while True:
-        candidate = os.path.join(dir_path, f"{base_name}-{counter}{ext}")
-        if not os.path.exists(candidate):
-            return candidate
-        counter += 1
 
 
 def main():
@@ -70,7 +58,10 @@ def main():
     wl_authors = load_wl_authors(WL_LIST_CSV)
     rows = load_rows(INPUT_CSV_PATH)
 
-    # Preflight preview + ENTER to continue
+    # 先打印 RAW product → folder 预览（方便你做 override）
+    preview_product_folder_mapping(rows)
+
+    # 仍然保留你原来的 preflight（编号检查、目录预览）
     if not preflight_preview(
         rows=rows,
         wl_authors=wl_authors,
@@ -95,78 +86,70 @@ def main():
             is_wl = creator_match in wl_authors
 
             # =========================
-            # 1) StdAds (ALL videos)
+            # Decide ONLY ONE destination:
+            # - WL: videos/wl/<creator_safe>/
+            # - StdAds: videos/<product_folder>/ or videos/unknown/
             # =========================
-            if product_folder == "unknown":
-                stdads_dir = os.path.join("videos", "unknown")
-                os.makedirs(stdads_dir, exist_ok=True)
-
-                stdads_base = f"{creator_handle}_StdAds_{product_token}"
-            else:
-                stdads_dir = os.path.join("videos", product_folder)
-                os.makedirs(stdads_dir, exist_ok=True)
-
-                start_num = START_NUM_BY_FOLDER.get(product_folder, UNKNOWN_START_NUM)
-                next_idx = get_next_index_for_dir(stdads_dir, start=start_num)
-                stdads_base = f"{next_idx}_{creator_handle}_StdAds_{product_token}"
-
-            print(f"\n[MAIN INFO]: Downloading {idx + 1}/{len(rows)}")
-            print(f"[MAIN INFO]: StdAds → {stdads_dir}/{stdads_base}.mp4")
-
-            stdads_success = False
-            wl_copy_success = False
-            stdads_filename = ""
-            wlads_filename = ""
-            wlads_dir = ""
             err = ""
-            ret = None
+            success = False
+            video_filename = ""
+            saved_dir = ""
+            filename_base = ""
 
+            if is_wl:
+                saved_dir = os.path.join("videos", "wl", creator_safe)
+                os.makedirs(saved_dir, exist_ok=True)
+
+                # WL 命名：不需要编号（你也可以想要编号的话我再给你加）
+                filename_base = f"{creator_handle}_WLAds_{product_token}"
+                print(f"\n[MAIN INFO]: Downloading {idx + 1}/{len(rows)} (WL)")
+                print(f"[MAIN INFO]: WL → {saved_dir}/{filename_base}.mp4")
+            else:
+                if product_folder == "unknown":
+                    saved_dir = os.path.join("videos", "unknown")
+                    os.makedirs(saved_dir, exist_ok=True)
+                    filename_base = f"{creator_handle}_StdAds_{product_token}"
+                else:
+                    saved_dir = os.path.join("videos", product_folder)
+                    os.makedirs(saved_dir, exist_ok=True)
+
+                    start_num = START_NUM_BY_FOLDER.get(product_folder, UNKNOWN_START_NUM)
+                    next_idx = get_next_index_for_dir(saved_dir, start=start_num)
+                    filename_base = f"{next_idx}_{creator_handle}_StdAds_{product_token}"
+
+                print(f"\n[MAIN INFO]: Downloading {idx + 1}/{len(rows)} (StdAds)")
+                print(f"[MAIN INFO]: StdAds → {saved_dir}/{filename_base}.mp4")
+
+            # =========================
+            # Download (ONLY ONCE)
+            # =========================
+            ret = None
             try:
                 ret = downloadVideo(
                     link=url,
                     id=idx,
-                    save_dir=stdads_dir,
-                    filename_base=stdads_base,
+                    save_dir=saved_dir,
+                    filename_base=filename_base,
                 )
-                stdads_success = bool(ret and os.path.exists(ret))
-                if stdads_success:
-                    stdads_filename = os.path.basename(ret)
+                success = bool(ret and os.path.exists(ret))
+                if success:
+                    video_filename = os.path.basename(ret)
             except Exception as e:
                 err = str(e)
 
             # =========================
-            # 2) WL copy (if applicable)
-            # =========================
-            if is_wl and stdads_success:
-                wlads_dir = os.path.join("videos", "wl", creator_safe)
-                os.makedirs(wlads_dir, exist_ok=True)
-
-                wlads_base = f"{creator_handle}_WLAds_{product_token}"
-                wl_dst_path = get_available_filepath(wlads_dir, wlads_base)
-
-                try:
-                    shutil.copy2(ret, wl_dst_path)
-                    wl_copy_success = True
-                    wlads_filename = os.path.basename(wl_dst_path)
-                    print(f"[MAIN INFO]: WL copy → {wl_dst_path}")
-                except Exception as e:
-                    wl_copy_success = False
-                    err = (err + " | " if err else "") + f"WL copy failed: {e}"
-
-            # =========================
-            # 3) Export CSV row
+            # Export CSV row (single set of columns)
             # =========================
             with open(CSV_PATH, "a", newline="", encoding="utf-8") as f:
                 writer = csv.writer(f)
                 writer.writerow([
                     creator_raw,
                     url,
-                    stdads_filename,
-                    stdads_dir,
-                    wlads_filename,
-                    wlads_dir,
-                    "yes" if stdads_success else "no",
-                    "yes" if wl_copy_success else "no",
+                    "yes" if is_wl else "no",
+                    product_folder,
+                    video_filename,
+                    saved_dir,
+                    "yes" if success else "no",
                     err,
                 ])
                 f.flush()
