@@ -93,6 +93,24 @@ def load_wl_authors(path: str) -> set:
     return s
 
 
+def load_ai_authors(path: str) -> set:
+    """
+    AI list 格式和 WL 一样：一行一个 creator（可带@）
+    命中后：main 里会 skip（不下载、不写 download_log）
+    """
+    s = set()
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                v = normalize_author(line)
+                if v:
+                    s.add(v)
+        print(f"[MAIN INFO]: Loaded {len(s)} AI authors")
+    else:
+        print(f"[MAIN WARN]: AI list not found, AI skip disabled")
+    return s
+
+
 def detect_delimiter(path: str) -> str:
     with open(path, "r", encoding="utf-8-sig") as f:
         sample = f.read(4096)

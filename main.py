@@ -8,6 +8,7 @@ from config import (
     INPUT_CSV_PATH,
     CSV_PATH,
     WL_LIST_CSV,
+    AI_LIST_CSV,          # <<< 新增
     SLEEP_SECONDS,
     START_NUM_BY_FOLDER,
     UNKNOWN_START_NUM,
@@ -15,6 +16,7 @@ from config import (
 
 from pipeline_utils import (
     load_wl_authors,
+    load_ai_authors,      # <<< 新增
     load_rows,
     preview_product_folder_mapping,
     normalize_author,
@@ -56,6 +58,7 @@ def main():
     ensure_csv_header(CSV_PATH)
 
     wl_authors = load_wl_authors(WL_LIST_CSV)
+    ai_authors = load_ai_authors(AI_LIST_CSV)   # <<< 新增
     rows = load_rows(INPUT_CSV_PATH)
 
     # 先打印 RAW product → folder 预览（方便你做 override）
@@ -79,6 +82,12 @@ def main():
             creator_match = normalize_author(creator_raw)
             creator_safe = sanitize_fs_name(creator_raw) or "unknown"
             creator_handle = f"@{creator_match or creator_safe}"
+
+            # ========= AI SKIP（只打印，不下载，不写download_log）=========
+            if creator_match in ai_authors:
+                print(f"\n[SKIP AI]: {creator_handle} | {url}")
+                print(f"[SKIP AI]: product_raw={product_raw}")
+                continue
 
             product_folder = product_to_folder(product_raw)
             product_token = product_to_token(product_raw)
