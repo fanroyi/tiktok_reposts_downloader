@@ -1,4 +1,3 @@
-# drive_fill_links.py
 from __future__ import annotations
 
 import csv
@@ -7,6 +6,7 @@ from typing import Dict, List
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 import config_drive as cfg
 
@@ -14,6 +14,9 @@ import config_drive as cfg
 SCOPES = ["https://www.googleapis.com/auth/drive.metadata.readonly"]
 
 
+# =========================
+# Utils
+# =========================
 def drive_folder_id_from_link(link_or_id: str) -> str:
     s = (link_or_id or "").strip()
     if "/folders/" in s:
@@ -28,27 +31,42 @@ def get_drive_service():
         cfg.SERVICE_ACCOUNT_JSON,
         scopes=SCOPES,
     )
-    return build("drive", "v3", credentials=creds)
+    return build(
+        "drive",
+        "v3",
+        credentials=creds,
+        cache_discovery=False,  # 避免一些奇怪的卡顿
+    )
 
 
+# =========================
+# Drive helpers
+# =========================
 @dataclass
 class DriveNode:
     id: str
     name: str
     mimeType: str
+    webViewLink: str
 
 
 def list_children(service, folder_id: str) -> List[DriveNode]:
+    """
+    List children of a folder.
+    IMPORTANT: webViewLink is fetched here to avoid per-file files().get()
+    """
     out: List[DriveNode] = []
     page_token = None
+
     while True:
         res = service.files().list(
             q=f"'{folder_id}' in parents and trashed=false",
-            fields="nextPageToken, files(id,name,mimeType)",
+            fields="nextPageToken, files(id,name,mimeType,webViewLink)",
             pageSize=1000,
             pageToken=page_token,
             supportsAllDrives=True,
             includeItemsFromAllDrives=True,
+            corpora="allDrives",
         ).execute()
 
         for f in res.get("files", []):
@@ -57,57 +75,80 @@ def list_children(service, folder_id: str) -> List[DriveNode]:
                     id=f["id"],
                     name=f.get("name", ""),
                     mimeType=f.get("mimeType", ""),
+                    webViewLink=f.get("webViewLink", "") or "",
                 )
             )
 
         page_token = res.get("nextPageToken")
         if not page_token:
             break
+
     return out
 
 
-def get_weblink(service, file_id: str) -> str:
-    res = service.files().get(
-        fileId=file_id,
-        fields="webViewLink",
-        supportsAllDrives=True,
-    ).execute()
-    return res.get("webViewLink", "") or ""
-
-
 def build_drive_filename_map(service, root_folder_id: str) -> Dict[str, str]:
+    """
+    Build mapping:
+        filename -> webViewLink
+    """
     mapping: Dict[str, str] = {}
     duplicates = 0
+    scanned_files = 0
+    scanned_folders = 0
 
     stack = [root_folder_id]
+
+    print(f"[INFO] Scanning Drive folder: {root_folder_id}", flush=True)
+
     while stack:
         fid = stack.pop()
-        for node in list_children(service, fid):
+        scanned_folders += 1
+
+        try:
+            children = list_children(service, fid)
+        except HttpError as e:
+            print(f"[WARN] Failed listing folder {fid}: {e}", flush=True)
+            continue
+
+        for node in children:
             if node.mimeType == "application/vnd.google-apps.folder":
                 stack.append(node.id)
                 continue
+
+            scanned_files += 1
 
             lower = node.name.lower()
             if not any(lower.endswith(ext) for ext in cfg.VIDEO_EXTENSIONS):
                 continue
 
-            link = get_weblink(service, node.id)
-            if not link:
+            if not node.webViewLink:
                 continue
 
-            if node.name in mapping and mapping[node.name] != link:
+            if node.name in mapping and mapping[node.name] != node.webViewLink:
                 duplicates += 1
-                print(f"[WARN] Duplicate filename on Drive: {node.name}")
+                print(f"[WARN] Duplicate filename on Drive: {node.name}", flush=True)
                 continue
 
-            mapping[node.name] = link
+            mapping[node.name] = node.webViewLink
 
-    print(f"[INFO] Drive video files indexed: {len(mapping)}")
+            if scanned_files % 200 == 0:
+                print(
+                    f"[INFO] scanned folders={scanned_folders}, files={scanned_files}, mapped={len(mapping)}",
+                    flush=True,
+                )
+
+    print(f"[INFO] Drive scan done")
+    print(f"[INFO] Total folders scanned: {scanned_folders}")
+    print(f"[INFO] Total video files indexed: {len(mapping)}")
     if duplicates:
         print(f"[INFO] Duplicate filename warnings: {duplicates}")
+
     return mapping
 
 
+# =========================
+# CSV update
+# =========================
 def update_csv_with_drive_links(drive_map: Dict[str, str]):
     with open(cfg.INPUT_CSV, "r", encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
@@ -153,6 +194,9 @@ def update_csv_with_drive_links(drive_map: Dict[str, str]):
     print(f"[INFO] Skipped rows: {skipped}")
 
 
+# =========================
+# Main
+# =========================
 def main():
     root_id = drive_folder_id_from_link(cfg.DRIVE_ROOT)
     service = get_drive_service()

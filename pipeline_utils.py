@@ -65,18 +65,35 @@ def product_to_folder(product_value: str) -> str:
 
 
 def product_to_token(product_value: str) -> str:
+    """
+    Product token used in filename.
+
+    Priority:
+    1) If PRODUCT_SUBFOLDER_MAP matches → use subfolder name as token
+    2) Otherwise fallback to parsed short token from raw product text
+    """
     if not product_value:
         return "UnknownProduct"
-    txt = product_value.strip()
+
+    raw = product_value.strip()
+
+    # ✅ 1) If mapped to a subfolder, reuse it as token
+    for k, v in PRODUCT_SUBFOLDER_MAP.items():
+        if k and k in raw:
+            # Turn "Cooling Blanket" → "CoolingBlanket"
+            return re.sub(r"\s+", "", v)
+
+    # 2) fallback (original behavior)
+    txt = raw
     if "|" in txt:
         txt = txt.split("|", 1)[1].strip()
 
     txt = re.sub(r"[^A-Za-z0-9 ]+", " ", txt)
     txt = re.sub(r"\s+", " ", txt).strip()
 
-    words = txt.split(" ")[:5]
-    token = "".join(w.capitalize() for w in words)
-    return token or "UnknownProduct"
+    words = txt.split(" ")[:4]
+    return "".join(w.capitalize() for w in words) or "UnknownProduct"
+
 
 
 def load_wl_authors(path: str) -> set:

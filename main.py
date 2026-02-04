@@ -8,7 +8,7 @@ from config import (
     INPUT_CSV_PATH,
     CSV_PATH,
     WL_LIST_CSV,
-    AI_LIST_CSV,          # <<< 新增
+    AI_LIST_CSV,
     SLEEP_SECONDS,
     START_NUM_BY_FOLDER,
     UNKNOWN_START_NUM,
@@ -16,7 +16,7 @@ from config import (
 
 from pipeline_utils import (
     load_wl_authors,
-    load_ai_authors,      # <<< 新增
+    load_ai_authors,
     load_rows,
     preview_product_folder_mapping,
     normalize_author,
@@ -34,11 +34,6 @@ os.makedirs(os.path.join("videos", "unknown"), exist_ok=True)
 
 
 def ensure_csv_header(path: str):
-    """
-    New unified CSV format:
-    - WL videos only stored under videos/wl/<creator>/
-    - StdAds videos stored under videos/<product_folder>/ or videos/unknown/
-    """
     if not os.path.exists(path):
         with open(path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
@@ -58,13 +53,12 @@ def main():
     ensure_csv_header(CSV_PATH)
 
     wl_authors = load_wl_authors(WL_LIST_CSV)
-    ai_authors = load_ai_authors(AI_LIST_CSV)   # <<< 新增
+    ai_authors = load_ai_authors(AI_LIST_CSV)
     rows = load_rows(INPUT_CSV_PATH)
 
-    # 先打印 RAW product → folder 预览（方便你做 override）
+    # Preview product → folder mapping
     preview_product_folder_mapping(rows)
 
-    # 仍然保留你原来的 preflight（编号检查、目录预览）
     if not preflight_preview(
         rows=rows,
         wl_authors=wl_authors,
@@ -83,56 +77,62 @@ def main():
             creator_safe = sanitize_fs_name(creator_raw) or "unknown"
             creator_handle = f"@{creator_match or creator_safe}"
 
-            # ========= AI SKIP（只打印，不下载，不写download_log）=========
+            # ===== AI SKIP =====
             if creator_match in ai_authors:
                 print(f"\n[SKIP AI]: {creator_handle} | {url}")
-                print(f"[SKIP AI]: product_raw={product_raw}")
                 continue
 
             product_folder = product_to_folder(product_raw)
             product_token = product_to_token(product_raw)
-
             is_wl = creator_match in wl_authors
 
-            # =========================
-            # Decide ONLY ONE destination:
-            # - WL: videos/wl/<creator_safe>/
-            # - StdAds: videos/<product_folder>/ or videos/unknown/
-            # =========================
             err = ""
             success = False
             video_filename = ""
             saved_dir = ""
             filename_base = ""
 
+            # =========================
+            # WL Ads
+            # =========================
             if is_wl:
                 saved_dir = os.path.join("videos", "wl", creator_safe)
                 os.makedirs(saved_dir, exist_ok=True)
 
-                # WL 命名：不需要编号（你也可以想要编号的话我再给你加）
-                filename_base = f"{creator_handle}_WLAds_{product_token}"
+                filename_base = f"{creator_handle}_{product_token}_WLAds"
+
                 print(f"\n[MAIN INFO]: Downloading {idx + 1}/{len(rows)} (WL)")
                 print(f"[MAIN INFO]: WL → {saved_dir}/{filename_base}.mp4")
+
+            # =========================
+            # Std Ads
+            # =========================
             else:
                 if product_folder == "unknown":
                     saved_dir = os.path.join("videos", "unknown")
                     os.makedirs(saved_dir, exist_ok=True)
-                    filename_base = f"{creator_handle}_StdAds_{product_token}"
+
+                    # unknown 不编号
+                    filename_base = f"{creator_handle}_{product_token}_StdAds"
+
                 else:
                     saved_dir = os.path.join("videos", product_folder)
                     os.makedirs(saved_dir, exist_ok=True)
 
-                    start_num = START_NUM_BY_FOLDER.get(product_folder, UNKNOWN_START_NUM)
+                    start_num = START_NUM_BY_FOLDER.get(
+                        product_folder, UNKNOWN_START_NUM
+                    )
                     next_idx = get_next_index_for_dir(saved_dir, start=start_num)
-                    filename_base = f"{next_idx}_{creator_handle}_StdAds_{product_token}"
+
+                    # ✅ 关键改动：编号放最前面
+                    filename_base = f"{next_idx}_{creator_handle}_{product_token}_StdAds"
 
                 print(f"\n[MAIN INFO]: Downloading {idx + 1}/{len(rows)} (StdAds)")
                 print(f"[MAIN INFO]: StdAds → {saved_dir}/{filename_base}.mp4")
 
             # =========================
-            # Download (ONLY ONCE)
+            # Download
             # =========================
-            ret = None
             try:
                 ret = downloadVideo(
                     link=url,
@@ -147,7 +147,7 @@ def main():
                 err = str(e)
 
             # =========================
-            # Export CSV row (single set of columns)
+            # CSV log
             # =========================
             with open(CSV_PATH, "a", newline="", encoding="utf-8") as f:
                 writer = csv.writer(f)
