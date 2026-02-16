@@ -3,7 +3,7 @@
 import csv
 
 # ========= Manual Config =========
-POSTED_DATE = "18-Dec-25"   # 手动改这里即可
+POSTED_DATE = "18-Dec-25"   # Manually update this value as needed
 """
 Jan
 Feb
@@ -24,7 +24,7 @@ OUTPUT_CSV = "notion_version.csv"
 
 def extract_product_from_saved_dir(saved_dir: str) -> str:
     """
-    从 saved_dir 里提取 Product 名
+    Extract product name from saved_dir.
     e.g. videos/Cooling Pillowcase/ -> Cooling Pillowcase
     """
     if not saved_dir:
@@ -49,7 +49,8 @@ def main():
         drive_link = (r.get("drive_link") or "").strip()
         saved_dir = (r.get("saved_dir") or "").strip()
 
-        # 只导出成功且已有 Drive link 的视频
+        # Only export rows where the download was successful
+        # and a Drive link is available
         if not video_filename or not drive_link:
             continue
 

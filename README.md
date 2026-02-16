@@ -91,6 +91,27 @@ pip install -r requirements.txt
 ## Quick Start
 
 1. Download videos:
+  you can use script to get start squence
+```bash
+python3 get_next_sequence_by_folder.py
+```
+  Example output
+  It prints something like:
+```bash
+    "CloudAlign Pillow": 2647,
+    "Cooling Blanket": 3880,
+    "Hotel Pillow": 4317,
+```
+  Apply the result
+  Copy the printed lines into your config.py:
+```bash
+START_NUM_BY_FOLDER = {
+    "CloudAlign Pillow": 2647,
+    "Cooling Blanket": 3880,
+    "Hotel Pillow": 4317,
+}
+```
+  start download video
 ```bash
 python3 main.py
 ```
@@ -100,7 +121,7 @@ python3 main.py
 python3 drive_fill_links.py
 ```
 
-3. Export/organize CSV for Notion:
+3. (optional step)Export/organize CSV for Notion:
 ```bash
 python3 make_notion_csv.py
 ```

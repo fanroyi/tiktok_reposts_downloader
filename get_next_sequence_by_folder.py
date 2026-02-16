@@ -2,11 +2,11 @@ import re
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 
-# ========= 配置 =========
+# ========= Configuration =========
 SERVICE_ACCOUNT_FILE = "service_account.json"
 SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
 
-# ✅ 你可以填 folder link 或 folder id
+# ✅ You can provide either a folder link or a folder ID
 ROOT_FOLDER = "https://drive.google.com/drive/folders/1SKhKRcwTm6lvDcw-ZCUFNxcDXLNdqS_0"
 # ROOT_FOLDER = "1SKhKRcwTm6lvDcw-ZCUFNxcDXLNdqS_0"
 
@@ -14,14 +14,14 @@ ROOT_FOLDER = "https://drive.google.com/drive/folders/1SKhKRcwTm6lvDcw-ZCUFNxcDX
 
 def parse_folder_id(s: str) -> str:
     s = s.strip()
-    # 1) 直接是 id
+    # 1) If input is already a folder ID
     if re.fullmatch(r"[A-Za-z0-9_-]{10,}", s) and "drive.google.com" not in s:
         return s
-    # 2) URL 里抽取 /folders/<id>
+    # 2) Extract ID from URL pattern: /folders/<id>
     m = re.search(r"/folders/([A-Za-z0-9_-]+)", s)
     if m:
         return m.group(1)
-    # 3) open?id=<id>
+    # 3) Extract ID from open?id=<id>
     m = re.search(r"[?&]id=([A-Za-z0-9_-]+)", s)
     if m:
         return m.group(1)
@@ -52,14 +52,15 @@ def list_files(service, folder_id):
     return results.get("files", [])
 
 def extract_sequence(filename):
-    # 只匹配： 123_xxx.mp4
+    # Only match pattern like: 123_xxx.mp4
     match = re.match(r"^(\d+)_", filename)
     return int(match.group(1)) if match else None
 
 def get_next_sequence_map(root_folder_id):
     service = get_drive_service()
 
-    # ✅ 先验证 root folder 本身存在（能更早暴露权限问题）
+    # ✅ Verify the root folder exists first
+    #    (helps surface permission issues early)
     service.files().get(fileId=root_folder_id, fields="id,name").execute()
 
     output = {}
@@ -89,4 +90,3 @@ if __name__ == "__main__":
     for k, v in result.items():
         print(f'    "{k}": {v},')
     print()
-

@@ -80,7 +80,7 @@ def product_to_token(product_value: str) -> str:
     # ✅ 1) If mapped to a subfolder, reuse it as token
     for k, v in PRODUCT_SUBFOLDER_MAP.items():
         if k and k in raw:
-            # Turn "Cooling Blanket" → "CoolingBlanket"
+            # Convert "Cooling Blanket" → "CoolingBlanket"
             return re.sub(r"\s+", "", v)
 
     # 2) fallback (original behavior)
@@ -112,8 +112,11 @@ def load_wl_authors(path: str) -> set:
 
 def load_ai_authors(path: str) -> set:
     """
-    AI list 格式和 WL 一样：一行一个 creator（可带@）
-    命中后：main 里会 skip（不下载、不写 download_log）
+    The AI list format is the same as WL:
+    one creator per line (can include '@').
+
+    If matched:
+    main.py will skip it (no download, no download_log entry).
     """
     s = set()
     if os.path.exists(path):
@@ -184,7 +187,7 @@ def get_next_index_for_dir(dir_path: str, start: int) -> int:
 
 def preview_product_folder_mapping(rows: list):
     """
-    Print unique RAW product names and their resulting subfolder names
+    Print unique raw product names and their resulting subfolder names
     BEFORE downloading, so you can decide overrides in config.py.
     """
     seen = {}

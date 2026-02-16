@@ -112,7 +112,7 @@ def main():
                     saved_dir = os.path.join("videos", "unknown")
                     os.makedirs(saved_dir, exist_ok=True)
 
-                    # unknown 不编号
+                    # Do not add numbering for "unknown"
                     filename_base = f"{creator_handle}_{product_token}_StdAds"
 
                 else:
@@ -124,7 +124,7 @@ def main():
                     )
                     next_idx = get_next_index_for_dir(saved_dir, start=start_num)
 
-                    # ✅ 关键改动：编号放最前面
+                    # ✅ Key change: put the sequence number at the very beginning
                     filename_base = f"{next_idx}_{creator_handle}_{product_token}_StdAds"
 
                 print(f"\n[MAIN INFO]: Downloading {idx + 1}/{len(rows)} (StdAds)")

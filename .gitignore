@@ -42,3 +42,6 @@ __pycache__/browser.cpython-313.pyc
 __pycache__/browser.cpython-313.pyc
 .DS_Store
 service_account.json
+client_secret.json
+*.csv
+AI_Block_List.csv
